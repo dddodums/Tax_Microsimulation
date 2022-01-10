@@ -6,6 +6,7 @@ Tax-Calculator GrowFactors class.
 # pylint --disable=locally-disabled growfactors.py
 
 import os
+import json
 import numpy as np
 import pandas as pd
 from taxcalc.utils import read_egg_csv
@@ -36,13 +37,33 @@ class GrowFactors(object):
     containing the default grow factors in the GrowFactors.FILENAME file.
     """
 
+    f = open('global_vars.json')
+    vars = json.load(f)
+    print("vars in growfactors", vars)
+
+    GROWFACTORS_FILENAME = vars['GROWFACTORS_FILENAME']
+    
     CUR_PATH = os.path.abspath(os.path.dirname(__file__))
-    FILENAME = 'growfactors.csv'
-    FILE_PATH = os.path.join(CUR_PATH, FILENAME)
+    #FILENAME = 'growfactors.csv'
+    FILE_PATH = os.path.join(CUR_PATH, GROWFACTORS_FILENAME)
 
     # TODO: Growfactors for Corporate and non-corporate Income heads are
     # TODO: currently set as same. New field names should be read in case we
     # TODO: want separate growfactors for Corporate and Non-corporate data.
+    f = open(os.path.join(CUR_PATH, vars['records_variables_filename']))
+    records_variables = json.load(f)
+    f = open(os.path.join(CUR_PATH, vars['corprecords_variables_filename']))
+    corprecords_variables = json.load(f)
+    f = open(os.path.join(CUR_PATH, vars['gstrecords_variables_filename']))
+    gstrecords_variables = json.load(f)
+
+    set1 = set(records_variables['read'].keys())
+    set2 = set(corprecords_variables['read'].keys())
+    set3 = set(gstrecords_variables['read'].keys()) 
+    set4 = set(['CPI'])
+    set5 = set(['CONSUMPTION', 'OTHER_CONS_ITEM'])
+    VALID_NAMES = set.union(set1, set2, set3, set4, set5)
+    """
     VALID_NAMES = set(['CPI', 'SALARY', 'RENT', 'BP_NONSPECULATIVE',
                        'BP_SPECULATIVE', 'BP_SPECIFIED', 'BP_PATENT115BBF',
                        'STCG_APPRATE', 'OINCOME', 'DEDUCTIONS',
@@ -50,24 +71,31 @@ class GrowFactors(object):
                        'ST_CG_AMT_2', 'LT_CG_AMT_1', 'LT_CG_AMT_2',
                        'LOSSES_CY', 'LOSSES_BF', 'AGRI_INCOME', 'CORP',
                        'INVESTMENT', 'CONSUMPTION', 'OTHER_CONS_ITEM'])
-
-    def __init__(self, growfactors_filename=FILE_PATH):
+    """
+    def __init__(self, growfactors_filename=GROWFACTORS_FILENAME):
         # read grow factors from specified growfactors_filename
         gfdf = pd.DataFrame()
-        if isinstance(growfactors_filename, str):
-            if os.path.isfile(growfactors_filename):
-                gfdf = pd.read_csv(growfactors_filename,
+        CUR_PATH = os.path.abspath(os.path.dirname(__file__))
+        #FILENAME = 'growfactors.csv'
+        growfactors_filepath = os.path.join(CUR_PATH, growfactors_filename)
+        if isinstance(growfactors_filepath, str):
+            if os.path.isfile(growfactors_filepath):
+                gfdf = pd.read_csv(growfactors_filepath,
                                    index_col='YEAR')
             else:
                 # cannot call read_egg_ function in unit tests
-                gfdf = read_egg_csv(GrowFactors.FILENAME,
+                gfdf = read_egg_csv(GrowFactors.GROWFACTORS_FILENAME,
                                     index_col='YEAR')  # pragma: no cover
         else:
             raise ValueError('growfactors_filename is not a string')
         assert isinstance(gfdf, pd.DataFrame)
         # check validity of gfdf column names
         gfdf_names = set(list(gfdf))
-        if gfdf_names != GrowFactors.VALID_NAMES:
+        #print(GrowFactors.GROWFACTORS_FILENAME)
+        #print("gfdf_names: ", gfdf_names)
+        #print("GrowFactors.VALID_NAMES: ", GrowFactors.VALID_NAMES)
+        if not gfdf_names.issubset(GrowFactors.VALID_NAMES):
+        #if gfdf_names != GrowFactors.VALID_NAMES:
             msg = ('missing names are: {} and invalid names are: {}')
             missing = GrowFactors.VALID_NAMES - gfdf_names
             invalid = gfdf_names - GrowFactors.VALID_NAMES
@@ -150,3 +178,10 @@ class GrowFactors(object):
             msg = 'year={} > GrowFactors.last_year={}'
             raise ValueError(msg.format(year, self.last_year))
         return self.gfdf[name][year]
+
+    def factor_names(self):
+        """
+        Return value of factor with specified name for specified year.
+        """
+        self.used = True
+        return set(self.gfdf.columns)
